@@ -13,9 +13,12 @@ Comandos soportados en el prompt raíz:
     set OPT VAL             Fijar una opción (global o del módulo)
     setg OPT VAL            Fijar una opción GLOBAL (aunque haya módulo cargado)
     unset OPT               Restaurar el valor por defecto de una opción
-    run | exploit           Ejecutar el módulo cargado
-    sessions [-i N|-k N|-k all]  Gestionar sesiones del handler
-    hosts | creds | vulns   Base de datos del workspace (-c limpia cada tabla)
+    run [-j]                Ejecutar el módulo (-j: como job en segundo plano)
+    jobs [-k ID|-k all|-c]  Tareas en segundo plano lanzadas con run -j
+    RHOSTS (opción)         Barrido multi-host estilo NetExec: CIDR, rango,
+                            @fichero o comas → una línea de resultado por host
+    sessions [-i N|-k N|-k all|-x N cmd]  Gestionar sesiones del handler
+    hosts | creds | vulns | services   Base de datos del workspace (-c limpia)
     notes [add|-c]          Cuaderno libre del operador
     export json|csv|md      Exportar el workspace a output/
     audit [N]               Traza de auditoría ética (workspace/audit.log)
@@ -30,7 +33,9 @@ import json
 import re
 import shlex
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -52,9 +57,12 @@ from core.ethics import EthicsGate
 from core.module_manager import ModuleManager, ModuloNoEncontrado
 from core.option_store import OptionStore
 from core.plugins import GestorPlugins as Plugins, PluginError
-from core.render import mostrar_consejos, mostrar_plan, mostrar_resultado
+from core.advice import consejos_de_resultado
+from core.render import (mostrar_consejos, mostrar_consejos_lista, mostrar_plan,
+                         mostrar_resultado)
 from core.reporter import Reporter
 from core.workspace_db import NOMBRE_DEFECTO, WorkspaceDB, ruta_de_workspace
+from core.targets import ObjetivoError, expandir_objetivos
 
 # Nombres válidos de workspace: a-z 0-9 _ - (1-24 caracteres)
 _NOMBRE_WS_VALIDO = re.compile(r"^[a-z0-9_-]{1,24}$")
@@ -81,9 +89,10 @@ class RedHavocFramework:
     COMANDOS = (
         "help", "?", "search", "use", "info", "show", "set", "unset",
         "setg", "unsetg", "run", "exploit", "back", "sessions", "hosts",
-        "creds", "vulns", "notes", "export", "audit", "consejos", "report",
-        "engagement", "attack", "resource", "workspace", "plugin", "banner",
-        "history", "clear", "exit", "quit",
+        "creds", "vulns", "services", "notes", "export", "audit",
+        "consejos", "report", "engagement", "attack", "resource",
+        "workspace", "plugin", "jobs", "banner", "history", "clear",
+        "exit", "quit",
     )
 
     def __init__(self, raiz) -> None:
@@ -115,6 +124,11 @@ class RedHavocFramework:
         self._inicio_sesion = time.time()
         self._informes_sesion = 0          # informes generados en esta sesión
         self._ultima_busqueda: List = []   # resultados de search (use/info <n>)
+
+        # Jobs en segundo plano (run -j): {id: {...estado, hilo...}}
+        self.jobs: Dict[int, Dict] = {}
+        self._siguiente_id_job = 1
+        self._lock_reporte = threading.Lock()   # serializa informes de jobs
         self.ctx = Ctx(self.globales, self.reporter, self.sesiones, self.workspace_db)
         self.plugins = Plugins(self.raiz, self.ethics)
         self._cargar_historial()
@@ -357,6 +371,8 @@ class RedHavocFramework:
             "hosts": self.cmd_hosts,
             "creds": self.cmd_creds,
             "vulns": self.cmd_vulns,
+            "services": self.cmd_services,
+            "jobs": self.cmd_jobs,
             "notes": self.cmd_notes,
             "export": self.cmd_export,
             "audit": self.cmd_audit,
@@ -396,12 +412,14 @@ class RedHavocFramework:
             ("set <OPT> <valor>", "Fijar una opción (o AUTHORIZED true en raíz)"),
             ("setg <OPT> <valor>", "Fijar una opción GLOBAL aunque haya módulo cargado"),
             ("unset · unsetg <OPT>", "Restaurar el valor por defecto (módulo · global)"),
-            ("run · exploit", "Ejecutar el módulo cargado"),
+            ("run · exploit [-j]", "Ejecutar el módulo cargado (-j: job en segundo plano)"),
+            ("jobs [-k ID | -k all | -c]", "Tareas en segundo plano lanzadas con run -j"),
             ("back", "Descargar el módulo actual (o Ctrl+C)"),
-            ("sessions [-i N | -k N | -k all]", "Listar / interactuar / cerrar sesiones"),
+            ("sessions [-i N | -x N cmd | -k N]", "Listar / interactuar / comando único / cerrar sesiones"),
             ("hosts [-c]", "Ver la base de datos de hosts del workspace (-c limpia)"),
             ("creds [-c]", "Ver credenciales válidas descubiertas (-c limpia)"),
             ("vulns [-c]", "Hallazgos/vulnerabilidades confirmados (-c limpia)"),
+            ("services", "Servicios/puertos descubiertos (vista plana de hosts)"),
             ("notes [add <texto> | -c]", "Notas libres del operador (persistidas en el workspace)"),
             ("workspace [new|use|del <n>]", "Workspaces múltiples estilo msf (cada uno con su DB)"),
             ("export json | csv | md", "Exportar el workspace (hosts/creds/vulns/notas) a output/"),
@@ -529,14 +547,16 @@ class RedHavocFramework:
 
         color_riesgo = {"bajo": "green", "medio": "yellow", "alto": "red"}[cls.RIESGO]
         attack_line = ", ".join(cls.ATTCK) if cls.ATTCK else "—"
+        cve_line = ", ".join(getattr(cls, "CVE", ()) or ()) or "—"
         meta = (
             f"[bold white]Nombre    [/bold white]: [modulo]{cls.NAME}[/modulo]\n"
             f"[bold white]Categoría [/bold white]: {cls.CATEGORIA}\n"
             f"[bold white]Riesgo    [/bold white]: [{color_riesgo}]{cls.RIESGO}[/{color_riesgo}]\n"
             f"[bold white]Autor     [/bold white]: {cls.AUTOR}\n"
-            f"[bold white]ATT&CK    [/bold white]: {attack_line}\n"
-            f"[bold white]Referencia[/bold white]: {cls.REFERENCIA or '—'}\n\n"
-            f"[bold white]Descripción[/bold white]\n{cls.DESCRIPCION}"
+            f"[bold white]ATT&CK    [/bold white]: {escape(attack_line)}\n"
+            f"[bold white]Referencia[/bold white]: {escape(cls.REFERENCIA or '—')}\n"
+            f"[bold white]CVE       [/bold white]: {escape(cve_line)}\n\n"
+            f"[bold white]Descripción[/bold white]\n{escape(cls.DESCRIPCION)}"
         )
         console.print(Panel(meta, title="info", border_style="dim"))
 
@@ -599,35 +619,69 @@ class RedHavocFramework:
                               f"Disponibles: {escape(disponibles)}")
 
     def cmd_run(self, args=None) -> None:
-        """Ejecuta el módulo cargado con validación, ética y reporte."""
+        """Ejecuta el módulo cargado con validación, ética y reporte.
+
+        run -j: lanza la ejecución como job en segundo plano (ver `jobs`).
+        Si el módulo declara la opción RHOSTS y tiene valor, se hace un
+        barrido multi-host (estilo NetExec): el framework expande los
+        objetivos y ejecuta el módulo contra cada uno con THREADS hilos,
+        pintando una línea de resultado por host.
+        """
+        args = list(args or [])
+        en_fondo = "-j" in args
+        if en_fondo:
+            args.remove("-j")
         if self.modulo_actual is None:
             console.print("[error][✗][/error] No hay módulo cargado. Usa [bold]use <modulo>[/bold].")
             return
         modulo = self.modulo_actual
-        error = modulo.opciones.validar_o_error()
+
+        # --- RHOSTS: objetivos multi-host (estilo NetExec) ----------------
+        texto_rhosts = ""
+        excluir: tuple = ()
+        if "RHOSTS" in modulo.opciones:
+            texto_rhosts = modulo.opciones.get("RHOSTS").strip()
+            if texto_rhosts:
+                excluir = ("RHOST", "TARGET")
+        error = modulo.opciones.validar_o_error(excluir)
         if error:
             console.print(f"[error][✗][/error] {escape(str(error))}")
             console.print("[dim]Pista: set <OPT> <valor> · show options[/dim]")
             return
+        objetivos: List[str] = []
+        if texto_rhosts:
+            try:
+                objetivos = expandir_objetivos(texto_rhosts)
+            except ObjetivoError as err:
+                console.print(f"[error][✗][/error] {escape(str(err))}")
+                return
+            if not objetivos:
+                console.print("[error][✗][/error] RHOSTS no produjo ningún objetivo.")
+                return
 
         # --- Engagement: scope y kill-date -------------------------------
         if self.engagement.activo():
-            valores = {o.nombre: o.valor for o in modulo.opciones if o.valor}
-            fuera_permitido = False
-            for nombre in NOMBRES_OBJETIVO:
-                permitido, motivo = self.engagement.verifica(valores.get(nombre, ""))
-                if not permitido:
-                    console.print(Panel(
-                        f"[bold red]BLOQUEADO por el engagement[/bold red]\n{escape(motivo)}\n\n"
-                        "Actualiza el alcance (engagement load) o trabaja solo con "
-                        "objetivos dentro del alcance autorizado.",
-                        border_style="red", title="engagement"))
-                    self.ethics.auditar("BLOQUEO_ENGAGEMENT", f"{modulo.NAME}: {motivo}")
+            if objetivos:
+                objetivos = self._filtrar_por_scope(modulo, objetivos)
+                if not objetivos:
                     return
-                if "fuera del alcance" in motivo:
-                    fuera_permitido = True
-            if fuera_permitido:
-                self.ethics.auditar("OBJETIVO_FUERA_ALCANCE_PERMITIDO", modulo.NAME)
+            else:
+                valores = {o.nombre: o.valor for o in modulo.opciones if o.valor}
+                fuera_permitido = False
+                for nombre in NOMBRES_OBJETIVO:
+                    permitido, motivo = self.engagement.verifica(valores.get(nombre, ""))
+                    if not permitido:
+                        console.print(Panel(
+                            f"[bold red]BLOQUEADO por el engagement[/bold red]\n{escape(motivo)}\n\n"
+                            "Actualiza el alcance (engagement load) o trabaja solo con "
+                            "objetivos dentro del alcance autorizado.",
+                            border_style="red", title="engagement"))
+                        self.ethics.auditar("BLOQUEO_ENGAGEMENT", f"{modulo.NAME}: {motivo}")
+                        return
+                    if "fuera del alcance" in motivo:
+                        fuera_permitido = True
+                if fuera_permitido:
+                    self.ethics.auditar("OBJETIVO_FUERA_ALCANCE_PERMITIDO", modulo.NAME)
 
         # --- Puerta ética para módulos de riesgo alto -------------------
         if str(modulo.RIESGO).lower() == "alto":
@@ -645,39 +699,36 @@ class RedHavocFramework:
 
         # --- Ejecución ---------------------------------------------------
         opciones_usadas = {o.nombre: o.valor for o in modulo.opciones if o.valor}
-        objetivo = modulo.opt("TARGET") or modulo.opt("URL") or modulo.opt("DOMAIN") \
-            or modulo.opt("LHOST") or modulo.opt("HOST") or "—"
+        objetivo = texto_rhosts or (modulo.opt("TARGET") or modulo.opt("URL")
+                                    or modulo.opt("DOMAIN") or modulo.opt("LHOST")
+                                    or modulo.opt("HOST") or "—")
+
+        if en_fondo:
+            self._lanzar_job(modulo, objetivos, str(objetivo), opciones_usadas)
+            return
+
         console.print(f"[info][*][/info] Ejecutando [modulo]{modulo.NAME}[/modulo] "
                       f"contra [bold]{escape(str(objetivo))}[/bold] ...")
         inicio = time.time()
-        try:
-            if getattr(modulo, "INTERACTIVO", False):
-                # Módulos interactivos (handlers): sin spinner, salida en vivo.
-                resultados = modulo.ejecutar()
-            else:
-                # Spinner propio con cronómetro en vivo; las impresiones del
-                # módulo se apilan encima del spinner en tiempo real.
-                with trabajo(modulo.NAME):
-                    resultados = modulo.ejecutar()
-        except ModuloError as err:
-            console.print(f"[error][✗][/error] {escape(str(err))}")
-            self.ethics.auditar("FALLO_MODULO", modulo.NAME)
-            return
-        except KeyboardInterrupt:
-            console.print("\n[aviso][!][/aviso] Módulo interrumpido por el operador.")
-            return
-        except Exception as err:  # noqa: BLE001
-            console.print(f"[error][✗][/error] Fallo inesperado: {escape(str(err))}")
-            if self.globales.get_bool("VERBOSE"):
-                console.print_exception()
-            return
+        if objetivos:
+            resultados, tipo_error = self._ejecutar_multihost(modulo, objetivos)
+        else:
+            resultados, tipo_error = self._ejecutar_solo(modulo)
         duracion = time.time() - inicio
+        if resultados is None:
+            if tipo_error == "controlado":
+                self.ethics.auditar("FALLO_MODULO", modulo.NAME)
+            return
 
-        modulo.resultado = resultados or {}
+        modulo.resultado = resultados
         console.print(f"[ok][+][/ok] Módulo completado en [bold]{duracion:.1f}s[/bold].")
 
         # --- Resultados EN la terminal (paneles/tablas/columnas) ---------
-        if isinstance(resultados, dict) and resultados:
+        if objetivos:
+            # En multi-host el detalle ya se pintó línea a línea; los
+            # siguientes pasos se deduplican de TODOS los resultados.
+            self._consejos_multihost(modulo.NAME, resultados)
+        elif isinstance(resultados, dict) and resultados:
             mostrar_resultado(modulo.NAME, resultados, console)
             # --- Siguientes pasos accionables (playbook) -----------------
             mostrar_consejos(modulo.NAME, resultados, console)
@@ -688,6 +739,372 @@ class RedHavocFramework:
             self._informes_sesion += 1
             console.print(f"[info][*][/info] Informe: [dim]{ruta}[/dim] (+ .md)")
         self.ethics.auditar("RUN", f"{modulo.NAME} -> {objetivo} ({duracion:.1f}s)")
+
+    # ------------------------------------------------------------------
+    # Ejecución: single-host, multi-host (NetExec-like) y jobs
+    # ------------------------------------------------------------------
+    def _filtrar_por_scope(self, modulo, objetivos: List[str]) -> List[str]:
+        """Engagement activo + barrido multi-host: verifica cada objetivo.
+
+        Devuelve la lista depurada (solo los permitidos). Si TODOS están
+        bloqueados muestra el panel y devuelve [].
+        """
+        bloqueados: List[tuple] = []
+        permitidos: List[str] = []
+        for obj in objetivos:
+            permitido, motivo = self.engagement.verifica(obj)
+            if permitido:
+                permitidos.append(obj)
+                if "fuera del alcance" in motivo:
+                    self.ethics.auditar("OBJETIVO_FUERA_ALCANCE_PERMITIDO",
+                                        f"{modulo.NAME}: {obj}")
+            else:
+                bloqueados.append((obj, motivo))
+                self.ethics.auditar("BLOQUEO_ENGAGEMENT", f"{modulo.NAME}: {motivo}")
+        for obj, motivo in bloqueados:
+            console.print(f"[error][✗][/error] {escape(obj)}: {escape(motivo)}")
+        if bloqueados and not permitidos:
+            console.print(Panel(
+                "[bold red]BLOQUEADO por el engagement[/bold red]\n"
+                "Ningún objetivo del barrido está dentro del alcance autorizado.\n\n"
+                "Actualiza el alcance (engagement load) o revisa RHOSTS.",
+                border_style="red", title="engagement"))
+            return []
+        if bloqueados:
+            console.print(f"[aviso][!][/aviso] {len(bloqueados)} objetivo(s) excluidos "
+                          "del barrido por el engagement.")
+        return permitidos
+
+    def _ejecutar_solo(self, modulo, silencioso: bool = False):
+        """Ejecución single-host. Devuelve (resultados, None) o (None, tipo)."""
+        try:
+            if silencioso or getattr(modulo, "INTERACTIVO", False):
+                # Jobs y handlers interactivos: sin spinner (salida en vivo).
+                resultados = modulo.ejecutar()
+            else:
+                # Spinner propio con cronómetro en vivo; las impresiones del
+                # módulo se apilan encima del spinner en tiempo real.
+                with trabajo(modulo.NAME):
+                    resultados = modulo.ejecutar()
+        except ModuloError as err:
+            console.print(f"[error][✗][/error] {escape(str(err))}")
+            return None, "controlado"
+        except KeyboardInterrupt:
+            console.print("\n[aviso][!][/aviso] Módulo interrumpido por el operador.")
+            return None, "interrumpido"
+        except Exception as err:  # noqa: BLE001
+            console.print(f"[error][✗][/error] Fallo inesperado: {escape(str(err))}")
+            if self.globales.get_bool("VERBOSE"):
+                console.print_exception()
+            return None, "inesperado"
+        return resultados or {}, None
+
+    @staticmethod
+    def _opcion_host_de(modulo) -> Optional[str]:
+        """Nombre de la opción que fija el host en el módulo dado."""
+        for nombre in ("RHOST", "TARGET"):
+            if nombre in modulo.opciones:
+                return nombre
+        return None
+
+    def _clonar_modulo(self, modulo, opcion_host: str, host: str):
+        """Instancia limpia del módulo con las opciones actuales y el host dado.
+
+        Cada hilo del barrido trabaja sobre SU instancia: sin condiciones
+        de carrera sobre las opciones compartidas.
+        """
+        instancia = type(modulo)()
+        instancia.ctx = self.ctx
+        for o in modulo.opciones:
+            instancia.opciones.set(o.nombre, o.valor)
+        instancia.opciones.set(opcion_host, host)
+        return instancia
+
+    def _ejecutar_multihost(self, modulo, objetivos: List[str],
+                            silencioso: bool = False, job: Optional[Dict] = None):
+        """Barrido multi-host: clona el módulo por objetivo y ejecuta.
+
+        THREADS hilos, una línea de resultado por host (estilo NetExec) y
+        agregado consolidado para el informe. Devuelve (agregado, None)
+        o (None, tipo_error).
+        """
+        opcion_host = self._opcion_host_de(modulo)
+        if opcion_host is None:
+            console.print("[error][✗][/error] El módulo no declara RHOST ni TARGET: "
+                          "no puede ejecutarse en modo multi-host.")
+            return None, "controlado"
+        hilos = self.globales.get_int("THREADS", 10) or 10
+        hilos = max(1, min(hilos, len(objetivos)))
+        inicio = time.time()
+        agregado: Dict = {"modo": "multi-host", "objetivos": len(objetivos),
+                          "resultados": {}}
+        contadores = {"ok": 0, "fallos": 0, "hecho": 0}
+
+        def _uno(host: str):
+            if job is not None and job["cancelar"].is_set():
+                return host, None, "cancelado"
+            try:
+                instancia = self._clonar_modulo(modulo, opcion_host, host)
+                return host, instancia.ejecutar(), None
+            except ModuloError as err:
+                return host, None, str(err)
+            except Exception as err:  # noqa: BLE001
+                return host, None, f"fallo inesperado: {err}"
+
+        def _recibir(host: str, res, fallo) -> None:
+            if not silencioso:
+                self._linea_host(host, res, fallo)
+            if fallo is None:
+                contadores["ok"] += 1
+                agregado["resultados"][host] = res if isinstance(res, dict) \
+                    else {"resumen": str(res)}
+            else:
+                contadores["fallos"] += 1
+                agregado["resultados"][host] = {"error": fallo}
+            contadores["hecho"] += 1
+            if job is not None:
+                job["hecho"] = contadores["hecho"]
+
+        if silencioso:
+            if hilos <= 1:
+                for host in objetivos:
+                    h, res, fallo = _uno(host)
+                    _recibir(h, res, fallo)
+            else:
+                with ThreadPoolExecutor(max_workers=hilos) as pool:
+                    futuros = [pool.submit(_uno, host) for host in objetivos]
+                    for futuro in as_completed(futuros):
+                        h, res, fallo = futuro.result()
+                        _recibir(h, res, fallo)
+        else:
+            with trabajo(f"{modulo.NAME} · {len(objetivos)} objetivos"):
+                if hilos <= 1:
+                    for host in objetivos:
+                        h, res, fallo = _uno(host)
+                        _recibir(h, res, fallo)
+                else:
+                    with ThreadPoolExecutor(max_workers=hilos) as pool:
+                        futuros = [pool.submit(_uno, host) for host in objetivos]
+                        for futuro in as_completed(futuros):
+                            h, res, fallo = futuro.result()
+                            _recibir(h, res, fallo)
+
+        duracion = time.time() - inicio
+        agregado["ok"] = contadores["ok"]
+        agregado["fallos"] = contadores["fallos"]
+        agregado["duracion"] = round(duracion, 1)
+        if not silencioso:
+            console.print(f"[info][*][/info] Barrido completado: [bold]{contadores['ok']}"
+                          f"[/bold] OK · [bold]{contadores['fallos']}[/bold] fallos · "
+                          f"[bold]{duracion:.1f}s[/bold] ({hilos} hilos).")
+        return agregado, None
+
+    @staticmethod
+    def _linea_host(host: str, resultado, fallo) -> None:
+        """Una línea de resultado por host (el sello NetExec)."""
+        host_txt = f"[bold cyan]{escape(host)}[/bold cyan]"
+        if fallo == "cancelado":
+            console.print(f"[aviso][!][/aviso] {host_txt} · cancelado")
+        elif fallo:
+            console.print(f"[error][−][/error] {host_txt} · {escape(fallo)}")
+        else:
+            linea = ""
+            if isinstance(resultado, dict):
+                linea = str(resultado.get("resumen") or resultado.get("nota") or "")
+            console.print(f"[ok][+][/ok] {host_txt} · {escape(linea or 'completado')}")
+
+    def _consejos_multihost(self, nombre: str, agregado: Dict) -> None:
+        """Siguientes pasos deduplicados a partir de TODOS los resultados."""
+        try:
+            vistos = set()
+            unicos = []
+            for res in (agregado.get("resultados") or {}).values():
+                if not isinstance(res, dict) or res.get("error"):
+                    continue
+                for consejo in consejos_de_resultado(nombre, res):
+                    clave = (consejo.texto, consejo.comando)
+                    if clave not in vistos:
+                        vistos.add(clave)
+                        unicos.append(consejo)
+            if unicos:
+                mostrar_consejos_lista(unicos[:4], console)
+        except Exception:  # noqa: BLE001 — los consejos jamás rompen un run
+            pass
+
+    # ------------------------------------------------------------------
+    # Jobs en segundo plano (run -j)
+    # ------------------------------------------------------------------
+    def _lanzar_job(self, modulo, objetivos: List[str], objetivo_txt: str,
+                    opciones_usadas: Dict) -> None:
+        job_id = self._siguiente_id_job
+        self._siguiente_id_job += 1
+        job: Dict = {
+            "id": job_id, "modulo": modulo.NAME, "objetivo": objetivo_txt,
+            "estado": "ejecutando", "inicio": time.time(), "fin": None,
+            "resumen": "", "ruta_informe": None, "hecho": 0,
+            "total": len(objetivos) or 1, "cancelar": threading.Event(),
+        }
+        self.jobs[job_id] = job
+        hilo = threading.Thread(
+            target=self._trabajador_job,
+            args=(job, modulo, objetivos, opciones_usadas, objetivo_txt),
+            name=f"redhavoc-job-{job_id}", daemon=True)
+        hilo.start()
+        modo = f"{len(objetivos)} objetivos" if objetivos else "ejecución única"
+        console.print(f"[ok][✓][/ok] Job [bold cyan]#{job_id}[/bold cyan] en segundo plano "
+                      f"· [modulo]{modulo.NAME}[/modulo] → {escape(objetivo_txt)} "
+                      f"[dim]({modo})[/dim] · consulta con [bold]jobs[/bold]")
+
+    def _trabajador_job(self, job: Dict, modulo, objetivos: List[str],
+                        opciones_usadas: Dict, objetivo_txt: str) -> None:
+        """Cuerpo del job: ejecuta, guarda informe y actualiza el estado."""
+        try:
+            if objetivos:
+                resultados, tipo_error = self._ejecutar_multihost(
+                    modulo, objetivos, silencioso=True, job=job)
+            else:
+                resultados, tipo_error = self._ejecutar_solo(modulo, silencioso=True)
+            job["fin"] = time.time()
+            if resultados is None:
+                job["estado"] = "cancelado" if tipo_error == "cancelado" else "error"
+                job["resumen"] = {
+                    "controlado": "el módulo terminó con error (ver el detalle al reejecutar)",
+                    "interrumpido": "interrumpido",
+                    "cancelado": "orden de parada recibida",
+                }.get(tipo_error or "", "error durante la ejecución")
+                self.ethics.auditar("JOB_FIN", f"#{job['id']} {modulo.NAME} ({job['estado']})")
+                return
+            if job["cancelar"].is_set():
+                # Parada recibida a mitad de barrido: los hosts restantes
+                # quedaron como "cancelado" en el agregado.
+                job["estado"] = "cancelado"
+                job["resumen"] = (f"parado tras {resultados.get('ok', 0)} OK de "
+                                  f"{resultados.get('objetivos', 0)} objetivos")
+                self.ethics.auditar("JOB_FIN", f"#{job['id']} {modulo.NAME} cancelado")
+                return
+            job["estado"] = "completado"
+            job["resumen"] = self._resumen_resultado(resultados)
+            if self.globales.get_bool("REPORT", True):
+                with self._lock_reporte:
+                    ruta = self.reporter.guardar(modulo.NAME, objetivo_txt,
+                                                 resultados, opciones_usadas)
+                job["ruta_informe"] = str(ruta)
+            self.ethics.auditar("JOB_FIN", f"#{job['id']} {modulo.NAME} completado")
+        except Exception as err:  # noqa: BLE001 — un job jamás tumba la consola
+            job["fin"] = time.time()
+            job["estado"] = "error"
+            job["resumen"] = f"fallo inesperado: {err}"
+
+    @staticmethod
+    def _resumen_resultado(resultados) -> str:
+        """Resumen corto del resultado de un job para el listado."""
+        if isinstance(resultados, dict):
+            if resultados.get("modo") == "multi-host":
+                return (f"{resultados.get('ok', 0)} OK · {resultados.get('fallos', 0)} "
+                        f"fallos de {resultados.get('objetivos', 0)} objetivos")
+            resumen = resultados.get("resumen")
+            if resumen:
+                return str(resumen)
+        return "completado"
+
+    def cmd_jobs(self, args) -> None:
+        """jobs | jobs -k <ID> | jobs -k all | jobs -c — tareas en segundo plano."""
+        if args and args[0] == "-k":
+            if len(args) > 1 and args[1].lower() == "all":
+                vivos = 0
+                for job in list(self.jobs.values()):
+                    if job["estado"] == "ejecutando":
+                        job["cancelar"].set()
+                        vivos += 1
+                    self.jobs.pop(job["id"], None)
+                console.print(f"[ok][✓][/ok] Jobs cerrados ({vivos} en marcha recibieron "
+                              "la orden de parada; se detendrán entre objetivos).")
+                return
+            if len(args) < 2:
+                console.print("[aviso][!][/aviso] Uso: jobs -k <ID> | jobs -k all | jobs -c")
+                return
+            try:
+                jid = int(args[1])
+            except ValueError:
+                console.print("[error][✗][/error] ID de job inválido.")
+                return
+            job = self.jobs.get(jid)
+            if job is None:
+                console.print(f"[error][✗][/error] El job {jid} no existe.")
+                return
+            if job["estado"] == "ejecutando":
+                job["cancelar"].set()
+                console.print(f"[ok][✓][/ok] Job #{jid}: orden de parada enviada "
+                              "(se detiene entre objetivos o al terminar la operación "
+                              "de red en curso).")
+            else:
+                self.jobs.pop(jid, None)
+                console.print(f"[ok][✓][/ok] Job #{jid} eliminado del listado.")
+            return
+        if args and args[0] == "-c":
+            activos = {j["id"]: j for j in self.jobs.values()
+                       if j["estado"] == "ejecutando"}
+            total = len(self.jobs) - len(activos)
+            self.jobs = activos
+            console.print(f"[ok][✓][/ok] Listado limpiado ({total} job(s) terminados "
+                          "eliminados; los activos se conservan).")
+            return
+        if args:
+            console.print("[aviso][!][/aviso] Uso: jobs | jobs -k <ID> | jobs -k all | jobs -c")
+            return
+        if not self.jobs:
+            console.print("[dim]No hay jobs. Lanza un módulo en segundo plano con: "
+                          "[white]run -j[/white] · luego consulta con jobs[/dim]")
+            return
+        tabla = Table(title="Jobs en segundo plano", border_style="dim")
+        tabla.add_column("ID", justify="right", style="bold cyan")
+        tabla.add_column("Módulo", style="modulo", no_wrap=True)
+        tabla.add_column("Objetivo", style="white", overflow="fold")
+        tabla.add_column("Estado", justify="center", no_wrap=True)
+        tabla.add_column("Dur.", justify="right", style="dim")
+        tabla.add_column("Detalle", style="white", overflow="fold")
+        for job in sorted(self.jobs.values(), key=lambda j: j["id"]):
+            estado = job["estado"]
+            color = {"ejecutando": "yellow", "completado": "green",
+                     "cancelado": "yellow"}.get(estado, "red")
+            if estado == "ejecutando" and job.get("total", 1) > 1:
+                detalle = f"{job.get('hecho', 0)}/{job['total']} objetivos"
+            else:
+                detalle = job.get("resumen") or ""
+            fin = job["fin"] or time.time()
+            tabla.add_row(str(job["id"]), job["modulo"], str(job["objetivo"]),
+                          f"[{color}]{estado}[/{color}]", f"{fin - job['inicio']:.0f}s",
+                          escape(detalle))
+        console.print(tabla)
+        console.print("[dim]Para un job: jobs -k <ID> · todos: jobs -k all · "
+                      "limpia terminados: jobs -c · los informes quedan en output/[/dim]")
+
+    # ------------------------------------------------------------------
+    def cmd_services(self, args) -> None:
+        """Tabla de servicios/puertos descubiertos (vista plana de hosts)."""
+        filas: List[tuple] = []
+        for h in self.workspace_db.hosts():
+            for entrada in h.get("servicios", []):
+                texto = str(entrada)
+                puerto, _, srv = texto.partition("/")
+                filas.append((h["ip"], puerto or texto, srv or "?",
+                              h.get("hostname") or ""))
+        if not filas:
+            console.print("[dim]Sin servicios registrados todavía: los escáneres "
+                          "los añaden (recon/port_scanner, ad/smb_check, "
+                          "recon/ping_sweep...).[/dim]")
+            return
+        tabla = Table(title=f"Servicios descubiertos [dim]({len(filas)})[/dim]",
+                      border_style="dim")
+        tabla.add_column("IP", style="bold cyan", no_wrap=True)
+        tabla.add_column("Puerto", justify="right", style="white", no_wrap=True)
+        tabla.add_column("Servicio", style="valor", no_wrap=True)
+        tabla.add_column("Hostname", style="dim", overflow="fold")
+        for ip, puerto, srv, hostname in filas:
+            tabla.add_row(ip, puerto, srv, hostname or "—")
+        console.print(tabla)
+        console.print("[dim]Los servicios viven en la tabla de hosts: se limpian "
+                      "con hosts -c[/dim]")
 
     def cmd_back(self, args=None) -> None:
         """Descarga el módulo actual."""
@@ -712,11 +1129,13 @@ class RedHavocFramework:
                 tabla.add_row(str(sid), f"{ses['addr'][0]}:{ses['addr'][1]}",
                               time.strftime("%H:%M:%S", time.localtime(ses["abierta"])))
             console.print(tabla)
-            console.print("[dim]Interactúa: sessions -i <ID> · cierra: sessions -k <ID> "
-                          "· todas: sessions -k all[/dim]")
+            console.print("[dim]Interactúa: sessions -i <ID> · comando único: sessions -x <ID> <cmd> "
+                          "· cierra: sessions -k <ID> · todas: sessions -k all[/dim]")
             return
         if args[0] == "-i" and len(args) > 1:
             self._interactuar_sesion(args[1])
+        elif args[0] == "-x" and len(args) >= 3:
+            self._comando_en_sesion(args[1], " ".join(args[2:]))
         elif args[0] == "-k" and len(args) > 1:
             if args[1].lower() == "all":
                 total = len(self.sesiones)
@@ -731,7 +1150,39 @@ class RedHavocFramework:
                 self._cerrar_sesion(args[1])
         else:
             console.print("[aviso][!][/aviso] Uso: sessions | sessions -i <ID> | "
-                          "sessions -k <ID> | sessions -k all")
+                          "sessions -x <ID> <comando> | sessions -k <ID> | sessions -k all")
+
+    def _comando_en_sesion(self, sid_txt: str, comando: str) -> None:
+        """Ejecuta un comando en una sesión SIN entrar en modo interactivo
+        (equivalente a sessions -i + comando + background, en un paso)."""
+        try:
+            sid = int(sid_txt)
+        except ValueError:
+            console.print("[error][✗][/error] ID de sesión inválido.")
+            return
+        ses = self.sesiones.get(sid)
+        if ses is None:
+            console.print(f"[error][✗][/error] La sesión {sid} no existe.")
+            return
+        conn = ses["conn"]
+        console.print(f"[bold cyan]sesión {sid}[/bold cyan] > {escape(comando)}")
+        try:
+            conn.sendall((comando + "\n").encode())
+            conn.settimeout(2.0)
+            salida = b""
+            while True:
+                try:
+                    chunk = conn.recv(4096)
+                except Exception:  # timeout ⇒ fin de la respuesta
+                    break
+                if not chunk:
+                    break
+                salida += chunk
+            texto = salida.decode(errors="replace")
+            console.print(texto or "[dim](sin salida)[/dim]")
+        except OSError as err:
+            console.print(f"[error][✗][/error] Conexión perdida: {err}")
+            self.sesiones.pop(sid, None)
 
     def _interactuar_sesion(self, sid_txt: str) -> None:
         """Bucle interactivo con una sesión (shell reversa simplificada)."""
@@ -1320,6 +1771,8 @@ class RedHavocFramework:
             ("Hallazgos", str(self.workspace_db.total_vulns())),
             ("Notas del operador", str(self.workspace_db.total_notas())),
             ("Informes generados", str(self._informes_sesion)),
+            ("Jobs lanzados", f"{len(self.jobs)} "
+             f"({sum(1 for j in self.jobs.values() if j['estado'] == 'ejecutando')} activos)"),
         )
         cuerpo = "\n".join(
             f"[bold white]{etiqueta.ljust(21)}[/bold white]: [valor]{valor}[/valor]"
@@ -1414,7 +1867,9 @@ class RedHavocFramework:
         if cmd == "workspace":
             return [s for s in ("new", "use", "del") if s.startswith(texto)]
         if cmd == "sessions":
-            return [s for s in ("-i", "-k") if s.startswith(texto)]
+            return [s for s in ("-i", "-x", "-k") if s.startswith(texto)]
+        if cmd == "jobs":
+            return [s for s in ("-k", "-c") if s.startswith(texto)]
         if cmd in ("hosts", "creds", "vulns"):
             return [s for s in ("-c",) if s.startswith(texto)]
         if cmd == "notes":

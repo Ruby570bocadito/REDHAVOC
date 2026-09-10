@@ -33,6 +33,7 @@ class BaseModulo(ABC):
     AUTOR: str = "REDHAVOC"
     REFERENCIA: str = ""                    # proyecto de inspiración, si aplica
     ATTCK: tuple = ()                       # técnicas MITRE ATT&CK asociadas
+    CVE: tuple = ()                         # CVEs/advisories relacionados (info)
 
     def __init__(self) -> None:
         self.opciones = OptionStore()

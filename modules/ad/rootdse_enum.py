@@ -98,6 +98,9 @@ class RootDseEnum(BaseModulo):
         self.opciones.declarar(
             "RHOST", "", True, "Controlador de dominio (IP o FQDN)")
         self.opciones.declarar(
+            "RHOSTS", "", False,
+            "Multi-host estilo NetExec: 10.0.0.0/24, 10.0.0.1-20, n1,n2 o @fichero")
+        self.opciones.declarar(
             "PUERTO", "389", False, "Puerto LDAP (389 claro o 636 LDAPS)")
         self.opciones.declarar(
             "TIMEOUT", "6", False, "Timeout por conexión en segundos")

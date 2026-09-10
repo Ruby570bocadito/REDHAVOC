@@ -69,6 +69,9 @@ class TelnetLogin(BaseModulo):
 
     def definir_opciones(self) -> None:
         self.opciones.declarar("TARGET", "", True, "Host Telnet objetivo")
+        self.opciones.declarar(
+            "RHOSTS", "", False,
+            "Multi-host estilo NetExec: 10.0.0.0/24, 10.0.0.1-20, n1,n2 o @fichero")
         self.opciones.declarar("PORT", "23", False, "Puerto Telnet")
         self.opciones.declarar("USERS", "usuarios_lab.txt", False,
                                "Wordlist de usuarios incluida, ruta o lista por comas")

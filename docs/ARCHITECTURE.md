@@ -48,7 +48,9 @@ El REPL. Responsabilidades:
   el prompt cambia de `redhavoc >` a `redhavoc (categoria/nombre) >`.
 - **Autocompletado TAB** vía `readline`: comandos, rutas de módulos y opciones.
 - **Gestión de sesiones**: registro compartido `{id: socket}` que rellena
-  `post/multi_handler` y consume `sessions -i/-k`.
+  `post/multi_handler` y consume `sessions -i/-x/-k`.
+- **Multi-host y jobs**: expansión `RHOSTS` (`core/targets`), ejecución
+  por clon con hilos, jobs en segundo plano (`run -j` / `jobs`).
 
 ### 2.2 `core.module_manager.ModuleManager`
 - Escanea `modules/` con `pkgutil.walk_packages` e importa cada fichero.
@@ -246,15 +248,37 @@ cronómetro `nombre · Xs`; boot 0.8 s con barra discreta.
 ## 3. Flujo de una ejecución (`run`)
 
 ```text
-run → ¿hay módulo? → validar opciones requeridas
+run [-j] → ¿hay módulo? → validar opciones requeridas
+         (con excluir RHOST/TARGET si RHOSTS define los objetivos)
+    → engagement: single = verifica opciones objetivo;
+                  multi  = verifica CADA objetivo expandido (excluye/audita)
     → si RIESGO==alto: ¿AUTHORIZED? (global/env) → si no, BLOQUEO + audit
-    → snapshot de opciones usadas y objetivo (TARGET/URL/DOMAIN/LHOST)
-    → ejecutar(): dentro de trabajo() (spinner+cronómetro; en vivo si INTERACTIVO)
+    → snapshot de opciones usadas y objetivo (TARGET/URL/RHOSTS...)
+    → run -j  → _lanzar_job: hilo daemon, estado en fw.jobs, informe en output/
+    → single  → ejecutar(): dentro de trabajo() (spinner; en vivo si INTERACTIVO)
+    → multi   → _ejecutar_multihost: clona el módulo POR HOST (sin carreras),
+                ThreadPoolExecutor(THREADS), una línea [+] / [-] por host,
+                agregado {ok, fallos, resultados} para el informe y
+                consejos deduplicados entre hosts
     → capturar ModuloError (limpio) / KeyboardInterrupt (cancelado)
     → render.mostrar_resultado: resultados pintados en la terminal
-    → si REPORT=true: guardar JSON+MD+HTML en output/
+    → si REPORT=true: guardar JSON+MD+HTML en output/ (lock si hay jobs)
     → audit.log: RUN modulo -> objetivo (duracion)
 ```
+
+### 3.1 Expansión de objetivos (`core/targets.py`)
+`RHOSTS` → lista de objetivos sin duplicados: CIDR (con tope verificado
+ANTES de materializar), rangos de último octeto y completos, listas con
+comas y `@fichero`. Tope duro `MAX_OBJETIVOS=1024`. Errores con
+`ObjetivoError` (mensaje accionable en la consola).
+
+### 3.2 Jobs (`run -j`)
+Cada job vive en un `Thread` daemon con su dict de estado (estado, inicio,
+fin, resumen, progreso n/total, `threading.Event` de cancelación). El
+trabajador ejecuta el mismo camino single/multi (silencioso, sin spinner)
+y serializa la escritura de informes con `self._lock_reporte`. La
+ cancelación se comprueba entre objetivos del barrido; el estado final
+(completado/cancelado/error) queda en `jobs` y en `audit.log`.
 
 ## 4. Decisiones de diseño
 

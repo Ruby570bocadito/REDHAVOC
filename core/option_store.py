@@ -113,14 +113,19 @@ class OptionStore:
     # ------------------------------------------------------------------
     # Validación
     # ------------------------------------------------------------------
-    def faltantes(self) -> list:
-        """Lista de nombres de opciones requeridas sin valor."""
-        return [o.nombre for o in self._opciones.values()
-                if o.requerido and not o.valor.strip()]
+    def faltantes(self, excluir: tuple = ()) -> list:
+        """Lista de nombres de opciones requeridas sin valor.
 
-    def validar_o_error(self) -> Optional[str]:
+        `excluir` permite ignorar opciones concretas: el framework la usa
+        para no exigir RHOST/TARGET cuando RHOSTS ya define los objetivos.
+        """
+        excluir = {n.upper() for n in excluir}
+        return [o.nombre for o in self._opciones.values()
+                if o.requerido and o.nombre not in excluir and not o.valor.strip()]
+
+    def validar_o_error(self, excluir: tuple = ()) -> Optional[str]:
         """Devuelve un mensaje de error si faltan opciones requeridas."""
-        faltan = self.faltantes()
+        faltan = self.faltantes(excluir)
         if not faltan:
             return None
         return "Faltan opciones obligatorias: " + ", ".join(faltan)

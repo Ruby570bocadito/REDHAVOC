@@ -3,6 +3,56 @@
 79 módulos nativos en 12 categorías. Todos aceptan las opciones globales
 (TIMEOUT, THREADS, USER_AGENT, PROXY) y generan informe JSON+MD+HTML+PDF.
 
+## 🆕 Novedades v2.3 — pulido y paridad: multi-host estilo NetExec, jobs y services
+
+### Barrido multi-host (RHOSTS)
+11 módulos estrella aceptan ahora la opción **`RHOSTS`**, que sustituye al
+host único y repite la ejecución contra cada objetivo con `THREADS` hilos
+y **una línea de resultado por host** (estilo NetExec): `ad/smb_check`,
+`ad/smb_login`, `ad/smb_share_enum`, `ad/rootdse_enum`,
+`ad/kerberos_userenum`, `ad/spn_enum`, `ad/ldap_enum`,
+`recon/port_scanner`, `brute/ftp_login`, `brute/telnet_login` y
+`brute/ssh_login`.
+
+```text
+redhavoc (recon/port_scanner) > set RHOSTS 10.0.0.0/24      # CIDR
+redhavoc (ad/smb_check)       > set RHOSTS 10.0.0.1-20      # rango
+redhavoc (ad/smb_login)       > set RHOSTS @objetivos.txt   # fichero
+redhavoc (ad/smb_check)       > set RHOSTS 10.0.0.5,10.0.0.7  # lista
+redhavoc (recon/port_scanner) > run
+[+] 10.0.0.1 · 1 abierto · 8000/http
+[+] 10.0.0.2 · 0 abiertos
+[*] Barrido completado: 2 OK · 0 fallos · 4.1s (10 hilos).
+```
+
+Formatos aceptados por `core/targets.py`: CIDR, rango del último octeto
+(`10.0.0.1-20`), rango completo (`10.0.0.1-10.0.0.20`), listas con comas y
+`@fichero` (una entrada por línea, `#` comentarios). Deduplicación
+automática y tope de 1024 objetivos por barrido. El engagement verifica
+CADA objetivo: los fuera de alcance se excluyen (auditados) y si todos lo
+están, el barrido se bloquea.
+
+### Jobs en segundo plano
+```text
+redhavoc (recon/port_scanner) > run -j
+[✓] Job #1 en segundo plano · recon/port_scanner → 10.0.0.0/24 (256 objetivos)
+redhavoc > jobs                  # estado, duración, progreso n/total
+redhavoc > jobs -k 1             # orden de parada (se detiene entre objetivos)
+redhavoc > jobs -k all · jobs -c # para todos · limpia los terminados
+```
+Cada job guarda su informe en `output/` al terminar (completado, cancelado
+o error — todo queda auditado). En `exit`, el resumen incluye los jobs.
+
+### Otros añadidos
+- **`services`**: vista plana de los servicios descubiertos (IP · Puerto ·
+  Servicio · Hostname).
+- **`sessions -x <ID> <cmd>`**: comando único en una sesión, sin entrar en
+  el modo interactivo.
+- **CVEs en `info`**: `ad/gpp_cpassword` muestra MS14-025 / CVE-2014-1812.
+- **Consejos garantizados para los 79 módulos** (test de cobertura).
+- Suite: **534 tests** + E2E en PTY real (barrido multi-host contra un lab
+  HTTP local y jobs en vivo).
+
 ## 🆕 Novedades v2.2 — protocolos nuevos: Redis, SNMP, GraphQL, CRLF, contenedores y RootDSE
 
 ### Módulos nuevos (73 → 79)

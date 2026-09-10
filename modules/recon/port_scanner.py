@@ -56,6 +56,9 @@ class PortScanner(BaseModulo):
 
     def definir_opciones(self) -> None:
         self.opciones.declarar("TARGET", "", True, "Host objetivo (IP o dominio)")
+        self.opciones.declarar(
+            "RHOSTS", "", False,
+            "Multi-host estilo NetExec: 10.0.0.0/24, 10.0.0.1-20, n1,n2 o @fichero")
         self.opciones.declarar("PORTS", "21,22,23,25,53,80,110,135,139,143,443,445,1433,3306,3389,5432,5900,6379,8080,8443,9200,27017", False,
                                "Puertos: lista separada por comas o rango 1-1000")
         self.opciones.declarar("BANNER", "true", False, "Capturar banner de servicio (true/false)")

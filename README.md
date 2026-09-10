@@ -1,13 +1,16 @@
 # REDHAVOC 🔴
 
+[![CI](https://github.com/Ruby570bocadito/REDHAVOC/actions/workflows/ci.yml/badge.svg)](https://github.com/Ruby570bocadito/REDHAVOC/actions/workflows/ci.yml)
+
 **Red Team Havoc Framework** — consola interactiva de ciberseguridad ofensiva
 estilo *Metasploit*, en Python 3 puro, con interfaz [Rich] moderna y profesional, 79 módulos
-nativos (12 categorías, incluidas **Active Directory** y **cloud**), **workspaces múltiples**,
-persistencia de opciones entre sesiones, AES-256 puro (GPP cpassword), **generador de PDF puro**
-para los informes, **plugins desde Git**, relay de phishing de laboratorio, base de datos de
-workspace (hosts/creds/**hallazgos**/**notas**), control de **engagement** con scope y
-kill-date, mapa **MITRE ATT&CK**, guiones **resource**, export del workspace a
-**JSON/CSV/MD/PDF**, reportes JSON/Markdown/HTML/PDF, historial persistente y una
+nativos (12 categorías, incluidas **Active Directory** y **cloud**), **barridos multi-host
+estilo NetExec** (RHOSTS: CIDR, rangos, @fichero), **jobs en segundo plano** (`run -j`),
+**workspaces múltiples**, persistencia de opciones entre sesiones, AES-256 puro (GPP cpassword),
+**generador de PDF puro** para los informes, **plugins desde Git**, relay de phishing de
+laboratorio, base de datos de workspace (hosts/creds/**hallazgos**/**notas**), control de
+**engagement** con scope y kill-date, mapa **MITRE ATT&CK**, guiones **resource**, export del
+workspace a **JSON/CSV/MD/PDF**, reportes JSON/Markdown/HTML/PDF, historial persistente y una
 puerta ética integrada con traza consultable (`audit`).
 
 > ⚠️ **Uso exclusivo en entornos AUTORIZADOS**: laboratorios propios,
@@ -18,9 +21,10 @@ puerta ética integrada con traza consultable (`audit`).
 
 | | | |
 |---|---|---|
-| ![Arranque de REDHAVOC](assets/img/02_banner.png) | ![Puerta ética](assets/img/01_etica.png) | ![Nube: categoría cloud](assets/img/09_cloud.png) |
-| ![Búsqueda y carga de módulos AD](assets/img/04_search_ad.png) | ![Ejecución con resultados](assets/img/06_portscan.png) | ![Opciones del módulo](assets/img/05_opciones.png) |
-| ![Workspace y consejos](assets/img/07_workspace.png) | ![Mapa MITRE ATT&CK](assets/img/08_attack.png) | ![Comandos](assets/img/03_help.png) |
+| ![Arranque de REDHAVOC](assets/img/02_banner.png) | ![Puerta ética](assets/img/01_etica.png) | ![Comandos](assets/img/03_help.png) |
+| ![Búsqueda y carga de módulos AD](assets/img/04_search_ad.png) | ![Opciones del módulo con RHOSTS](assets/img/05_opciones.png) | ![Barrido multi-host estilo NetExec](assets/img/06_multihost.png) |
+| ![Workspace, services y consejos](assets/img/07_workspace.png) | ![Jobs en segundo plano](assets/img/09_jobs.png) | ![Mapa MITRE ATT&CK](assets/img/08_attack.png) |
+| ![Nube: categoría cloud](assets/img/10_cloud.png) | | |
 
 *(capturas reales de la consola en un PTY — sin retoques)*
 
@@ -30,7 +34,9 @@ puerta ética integrada con traza consultable (`audit`).
 
 | | |
 |---|---|
-| 🖥️ **Consola msf-like** | `search` (filtros `cat:`/`riesgo:`) · `use <n>` · `set`/`setg` · `show options` · `run` · `back` · `sessions` · `hosts` · `creds` · `vulns` · `notes` · `workspace new/use/del` · `plugin` · `consejos` · `export` · `audit` · `resource` |
+| 🖥️ **Consola msf-like** | `search` (filtros `cat:`/`riesgo:`) · `use <n>` · `set`/`setg` · `show options` · `run [-j]` · `jobs` · `back` · `sessions` (`-i`/`-x`/`-k`) · `hosts` · `creds` · `vulns` · `services` · `notes` · `workspace new/use/del` · `plugin` · `consejos` · `export` · `audit` · `resource` |
+| 🌐 **Multi-host (NetExec-like)** | La opción `RHOSTS` acepta CIDR (`10.0.0.0/24`), rangos (`10.0.0.1-20`), listas y `@fichero`: el módulo se ejecuta contra cada host con `THREADS` hilos y una línea de resultado por objetivo |
+| ⚙️ **Jobs en segundo plano** | `run -j` lanza el módulo como job: `jobs` lista estado/duración/informe, `jobs -k <id>` para entre objetivos, todo auditado |
 | 🎨 **UI moderna y profesional** | Cromo neutro con acento frío, banner flat, animación de arranque sutil, spinner con cronómetro, **resultados pintados en la terminal** (tablas/paneles/columnas), árbol de módulos y autocompletado TAB |
 | 🧭 **Consejos accionables** | Cada resultado genera *Siguientes pasos* con el comando exacto a ejecutar (playbook integrado); `consejos` resume el plan de batalla del workspace |
 | 🧩 **79 módulos nativos** | recon (10) · web (19) · phishing (5) · payloads (3) · post (2) · opsec (3) · osint (13) · iot (3) · brute (4) · dos (1) · **ad (12)** · **cloud (4)** |
@@ -81,13 +87,22 @@ redhavoc (post/multi_handler) > setg TIMEOUT 9   # opción GLOBAL sin salir del 
 redhavoc (post/multi_handler) > run      # Ctrl+C para detener el listener
 redhavoc > sessions                      # lista sesiones capturadas
 redhavoc > sessions -i 1                 # interactúa con la sesión 1
+redhavoc > sessions -x 1 whoami          # comando único sin entrar en la shell
 redhavoc > sessions -k all               # ciérralas todas
 
 redhavoc > use recon/port_scanner        # el scanner rellena el workspace
 redhavoc (recon/port_scanner) > set TARGET 10.0.0.1
 redhavoc (recon/port_scanner) > run
 redhavoc > hosts                         # host + puertos descubiertos
+redhavoc > services                      # vista plana de servicios/puertos
 redhavoc > creds                         # credenciales válidas (módulos brute)
+
+redhavoc > set RHOSTS 10.0.0.0/24        # ¡BARRIDO MULTI-HOST! (módulos con RHOSTS)
+redhavoc (recon/port_scanner) > run      # una línea [+] por host · THREADS hilos
+
+redhavoc > run -j                        # job en segundo plano
+redhavoc > jobs                          # estado, duración e informe de cada job
+redhavoc > jobs -k all                   # para todos (se detienen entre objetivos)
 
 redhavoc > engagement load engagement.json   # alcance + kill-date de la operación
 redhavoc > engagement                     # estado del engagement
@@ -163,7 +178,7 @@ De vuelta en REDHAVOC: `sessions` → `sessions -i 1` → escribe comandos →
 `background` para volver. Las sesiones capturadas por el handler TLS se
 gestionan igual (el descifrado es transparente en la consola).
 
-## 🧩 Módulos incluidos (73)
+## 🧩 Módulos incluidos (79)
 
 ### 🔎 recon
 | Módulo | Descripción | Riesgo |
@@ -176,6 +191,8 @@ gestionan igual (el descifrado es transparente en la consola).
 | `recon/http_headers` | Auditoría de cabeceras de seguridad con puntuación | bajo |
 | `recon/ping_sweep` | Hosts vivos en una red CIDR (TCP-ping + ICMP, sin root) | medio |
 | `recon/smtp_enum` | Enumeración de buzones SMTP con VRFY/EXPN/RCPT (cliente propio) | medio |
+| `recon/redis_enum` | Auditoría de Redis sin auth: INFO, DBSIZE, claves (cliente RESP propio) | medio |
+| `recon/snmp_enum` | Consulta SNMP v1/v2c GET/GETNEXT con encoder/decoder ASN.1 BER propio | medio |
 
 ### 🌐 web
 | Módulo | Descripción | Riesgo |
@@ -197,6 +214,8 @@ gestionan igual (el descifrado es transparente en la consola).
 | `web/host_header_injection` | Reflexión de Host/X-Forwarded-Host con sonda inexistente (reset/cache poisoning) | bajo |
 | `web/open_redirect` | Sonda inerte de redirección abierta: Location y meta-refresh, sin seguirla | bajo |
 | `web/subdomain_takeover` | CNAME colgado + 15 firmas (GitHub Pages, S3, Azure, Heroku...) con DNS propio | medio |
+| `web/graphql_probe` | Endpoints GraphQL: introspección, playgrounds y consola GraphiQL | medio |
+| `web/crlf_scan` | Inyección CRLF en cabeceras de respuesta con canario único por prueba | medio |
 
 ### 🎣 phishing
 | Módulo | Descripción | Riesgo |
@@ -274,6 +293,7 @@ gestionan igual (el descifrado es transparente en la consola).
 | `ad/passwd_spray` | Password spray Kerberos con canario anti-lockout y pausa | alto |
 | `ad/net_discover` | Escucha PASIVA de LLMNR/NBT-NS/mDNS (no envenena) | medio |
 | `ad/gpp_cpassword` | Descifra cpassword de GPP con AES-256 puro (MS14-025) | medio |
+| `ad/rootdse_enum` | RootDSE anónima: DN base, esquema, niveles funcionales del bosque | bajo |
 
 ### ☁️ cloud (almacenamiento anónimo — solo lectura, MITRE T1619)
 | Módulo | Descripción | Riesgo |
@@ -281,6 +301,7 @@ gestionan igual (el descifrado es transparente en la consola).
 | `cloud/s3_enum` | Cubos S3 con listado anónimo (ListObjectsV2): LISTABLE/PROTEGIDO/NO_EXISTE | bajo |
 | `cloud/azure_blob` | Contenedores de Azure Blob listables sin credenciales | bajo |
 | `cloud/gcs_enum` | Cubos de Google Cloud Storage con metadata/listado anónimo | bajo |
+| `cloud/k8s_enum` | Planos de control de contenedores expuestos: Kubernetes API, kubelet, Docker (T1613) | medio |
 
 > Los módulos **brute**, **dos** y **ad/passwd_spray** solo funcionan con
 > `AUTHORIZED=true` y aplican topes duros de diseño: pretenden validar contraseñas
@@ -315,10 +336,10 @@ REDHAVOC/
 │   ├── ethics.py          #   disclaimer + auditoría
 │   ├── banner.py          #   arte ASCII
 │   └── colors.py          #   tema Rich
-├── modules/               # 73 módulos en 12 categorías
+├── modules/               # 79 módulos en 12 categorías
 ├── plugins/               # plugins instalados (plugin install)
 ├── templates/             # phishing (12 páginas), payloads, wordlists, informe ejecutivo, engagement_ejemplo.json
-├── tests/                 # suite pytest (454 tests)
+├── tests/                 # suite pytest (534 tests)
 ├── assets/img/            # capturas de la consola para la documentación
 ├── docs/                  # ARCHITECTURE · MODULES · DEVELOPMENT
 ├── output/                # informes generados (JSON/MD/HTML/PDF)
@@ -328,19 +349,20 @@ REDHAVOC/
 ## 🧪 Tests
 
 ```bash
-python3 -m pytest tests/ -q      # 454 tests unitarios + integración + E2E
+python3 -m pytest tests/ -q      # 534 tests unitarios + integración + E2E
 ```
 
 Incluyen: opciones, gestor de módulos, reporter (JSON/MD/HTML/PDF), generador
 PDF, plugins, workspace DB, ética, REPL, parser DNS binario, escáner de
-puertos contra localhost, mocks de red para todos los módulos y pruebas E2E
-de la consola completa.
+puertos contra localhost, expansión de objetivos RHOSTS, jobs, mocks de red
+para todos los módulos y pruebas E2E de la consola completa (incluido PTY real).
 
 ## 📚 Documentación
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — diseño interno del framework
 - [docs/MODULES.md](docs/MODULES.md) — catálogo detallado con ejemplos por módulo
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — crea tus propios módulos en 5 minutos
+- [docs/RESEARCH_MEJORAS.md](docs/RESEARCH_MEJORAS.md) — estudio de referentes (NetExec, msf, C2...) y plan de mejoras
 - [DISCLAIMER.md](DISCLAIMER.md) — aviso legal y ético
 
 ## 🛣️ Roadmap
@@ -364,8 +386,13 @@ de la consola completa.
 - [x] **Relay inverso de phishing** de laboratorio (`phishing/relay_proxy`) — hecho en v2.1
 - [x] **Plugins desde Git** (`plugin install/list/del` con revisión y auditoría) — hecho en v2.1
 - [x] Categoría **cloud** (S3/Azure/GCS anónimo), takeover, host header, open redirect, métodos HTTP y dorks — hecho en v2.1 (73 módulos)
-- [ ] Integración continua (CI) con badge de tests
+- [x] redis_enum, snmp_enum, graphql_probe, crlf_scan, k8s_enum y rootdse_enum — hecho en v2.2 (79 módulos)
+- [x] **Barrido multi-host estilo NetExec** (`RHOSTS`: CIDR/rangos/@fichero, línea por host, clones por hilo) — hecho en v2.3
+- [x] **Jobs en segundo plano** (`run -j`, `jobs`, `jobs -k`) + comando `services` + `sessions -x` + CVEs en `info` — hecho en v2.3
+- [x] **Integración continua (CI)** con badge de tests (Python 3.9–3.12) — hecho en v2.3
 - [ ] Modo `verbose` por módulo con trazas técnicas ampliadas
+- [ ] Loot (artefactos capturados por host) + CVSS/remediación en el informe PDF — v2.4
+- [ ] ADCS (`adcs_enum`) y detección de coerción (`coerce_check`) — v2.5
 
 ## 📄 Licencia
 

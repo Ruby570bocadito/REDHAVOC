@@ -3,6 +3,79 @@
 Todos los cambios notables de REDHAVOC se documentan aquí.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.3.0] — 2026-09-11 (pulido y paridad: multi-host estilo NetExec · jobs · services)
+
+### Added
+- **Barrido multi-host estilo NetExec** (la mejora mayor de la versión):
+  - Nueva opción **`RHOSTS`** en 11 módulos estrella (`ad/smb_check`,
+    `ad/smb_login`, `ad/smb_share_enum`, `ad/rootdse_enum`,
+    `ad/kerberos_userenum`, `ad/spn_enum`, `ad/ldap_enum`,
+    `recon/port_scanner`, `brute/ftp_login`, `brute/telnet_login`,
+    `brute/ssh_login`): acepta **CIDR** (`10.0.0.0/24`), **rangos**
+    (`10.0.0.1-20` o `10.0.0.1-10.0.0.20`), **listas** (`n1,n2`) y
+    **`@fichero`** (un objetivo por línea, `#` comentarios).
+  - `core/targets.py` expande los objetivos con deduplicación y tope duro
+    (MAX_OBJETIVOS=1024; un /8 se rechaza ANTES de materializar).
+  - El framework **clona el módulo por host** (sin carreras sobre las
+    opciones compartidas) y lo ejecuta con `THREADS` hilos, pintando
+    **una línea de resultado por host** (`[+] host · resumen` /
+    `[-] host · motivo`) y un agregado consolidado con el resumen por
+    objetivo que va al informe.
+  - Los **siguientes pasos** del barrido se deduplican de todos los
+    resultados por host (`mostrar_consejos_lista` en `core/render.py`).
+  - El **engagement** verifica cada objetivo del barrido individualmente:
+    los fuera de alcance se excluyen con aviso y auditoría; si TODOS lo
+    están, se bloquea la ejecución.
+- **Jobs en segundo plano**: `run -j` lanza el módulo como job; `jobs`
+  lista ID/módulo/objetivo/estado/duración (con progreso `n/total` en
+  barridos), `jobs -k <id>` envía orden de parada (se detiene entre
+  objetivos), `jobs -k all` y `jobs -c`. Cada job guarda su informe en
+  `output/` (escrituras serializadas con `threading.Lock`) y el estado
+  final (completado/cancelado/error) queda auditado.
+- **Comando `services`**: vista plana de todos los servicios/puertos
+  descubiertos en el workspace (IP · Puerto · Servicio · Hostname).
+- **`sessions -x <ID> <comando>`**: ejecuta un comando en una sesión del
+  handler sin entrar en el modo interactivo (equivalente a `-i` + comando
+  + `background` en un paso).
+- **CVEs en `info`**: los módulos pueden declarar `CVE = (...)` y la ficha
+  muestra la línea (primero: `ad/gpp_cpassword` → MS14-025/CVE-2014-1812).
+- **Test de cobertura de consejos para TODOS los módulos**: garantiza que
+  los 79 módulos producen "siguientes pasos" siempre (extiende la
+  garantía anterior de coherencia).
+- **Integración continua**: `.github/workflows/ci.yml` — `compileall` +
+  `pytest` en matriz Python 3.9–3.12, con badge en el README.
+- **50 tests nuevos** (`tests/test_v23.py`, total de la suite: **534**):
+  expansión de objetivos (CIDR/rangos/fichero/topes/errores), validación
+  con `excluir`, barrido multi-host (éxito, fallo parcial, hilos=1,
+  consejos deduplicados, informe agregado), engagement con RHOSTS
+  (exclusión parcial y bloqueo total), jobs (completado, multi-host,
+  listado, cancelación entre objetivos, error, `-k all`, `-c`),
+  `services`, `sessions -x` con socketpair real, CVE en `info` y
+  cobertura de consejos.
+- `docs/RESEARCH_MEJORAS.md`: estudio de referentes (NetExec, Metasploit,
+  Sliver/Mythic/Havoc, Osmedeus/Recon-ng, Certipy, reporting 2025) con
+  matriz de 15 huecos, priorización P0-P3 y plan por versiones.
+
+### Changed
+- `OptionStore.validar_o_error(excluir=())`: el framework no exige
+  RHOST/TARGET cuando RHOSTS define los objetivos.
+- El informe de una ejecución multi-host contiene el agregado consolidado
+  (modo/objetivos/OK/fallos/resultados por host).
+- El resumen de salida (`exit`) incluye la fila "Jobs lanzados".
+- Ayuda, docstring de la consola y autocompletado TAB actualizados
+  (jobs, services, sessions -x, run -j).
+- README al día: badge CI, conteos corregidos (79 en todas las tablas),
+  6 fichas que faltaban (redis_enum, snmp_enum, graphql_probe, crlf_scan,
+  k8s_enum, rootdse_enum) y cheat sheet con los comandos nuevos.
+
+### Fixed
+- `jobs -k <id>` sobre un job en marcha lo SACABA del listado y su estado
+  final se perdía: ahora mantiene la entrada y el trabajador marca el
+  estado final (cancelado/completado) visible en `jobs`.
+- La cancelación a mitad de barrido se contabilizaba como "fallos" y el
+  job acababa "completado": ahora el estado refleja la parada y cuántos
+  hosts OK se completaron antes.
+
 ## [2.2.0] — 2026-09-10 (protocolos nuevos: Redis · SNMP · GraphQL · CRLF · contenedores · RootDSE)
 
 ### Added

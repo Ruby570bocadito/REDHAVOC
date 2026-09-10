@@ -36,6 +36,9 @@ class SshLogin(BaseModulo):
 
     def definir_opciones(self) -> None:
         self.opciones.declarar("TARGET", "", True, "Host SSH objetivo (IP o dominio)")
+        self.opciones.declarar(
+            "RHOSTS", "", False,
+            "Multi-host estilo NetExec: 10.0.0.0/24, 10.0.0.1-20, n1,n2 o @fichero")
         self.opciones.declarar("PORT", "22", False, "Puerto SSH")
         self.opciones.declarar("USERS", "root,admin,ubuntu,pi,usuario", False,
                                "Wordlist de usuarios incluida, ruta o lista CSV")

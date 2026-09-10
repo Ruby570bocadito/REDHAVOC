@@ -259,6 +259,24 @@ def mostrar_consejos(nombre_modulo: str, datos: dict, console) -> None:
                         border_style="dim", expand=False, padding=(0, 1)))
 
 
+def mostrar_consejos_lista(consejos: list, console) -> None:
+    """Panel 'Siguientes pasos' a partir de una lista de Consejos ya calculada
+    (la usa el barrido multi-host, que deduplica consejos entre hosts)."""
+    try:
+        if not consejos:
+            return
+        lineas = []
+        for i, consejo in enumerate(consejos, 1):
+            fila = f"[dim]{i}.[/dim] {escape(consejo.texto)}"
+            if consejo.comando:
+                fila += f"   [accent]→ {escape(consejo.comando)}[/accent]"
+            lineas.append(fila)
+        console.print(Panel("\n".join(lineas), title="siguientes pasos",
+                            border_style="dim", expand=False, padding=(0, 1)))
+    except Exception:  # noqa: BLE001 — los consejos jamás rompen un run
+        pass
+
+
 def mostrar_plan(console, workspace) -> None:
     """Plan de batalla del workspace para el comando `consejos`."""
     try:

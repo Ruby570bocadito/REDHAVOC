@@ -23,7 +23,7 @@ def silenciar_insecure_request() -> None:
 
 silenciar_insecure_request()
 
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 __nombre__ = "REDHAVOC"
 __eslogan__ = "Red Team Havoc Framework"
 __autor__ = "Proyecto REDHAVOC"

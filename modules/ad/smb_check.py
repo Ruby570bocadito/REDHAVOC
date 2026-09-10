@@ -37,6 +37,9 @@ class SmbCheck(BaseModulo):
 
     def definir_opciones(self) -> None:
         self.opciones.declarar("RHOST", "", True, "IP o nombre del host / controlador")
+        self.opciones.declarar(
+            "RHOSTS", "", False,
+            "Multi-host estilo NetExec: 10.0.0.0/24, 10.0.0.1-20, n1,n2 o @fichero")
         self.opciones.declarar("PUERTO", "445", False, "Puerto SMB (445 directo)")
 
     def ejecutar(self) -> dict:

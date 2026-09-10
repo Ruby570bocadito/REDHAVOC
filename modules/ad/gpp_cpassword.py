@@ -90,6 +90,7 @@ class GppCpassword(BaseModulo):
     RIESGO = "medio"
     AUTOR = "REDHAVOC"
     REFERENCIA = "MS-GPPREF · MS14-025 · BloodHound/GPPObj"
+    CVE = ("MS14-025", "CVE-2014-1812")
     ATTCK = ("T1552.006",)
 
     def definir_opciones(self) -> None:
