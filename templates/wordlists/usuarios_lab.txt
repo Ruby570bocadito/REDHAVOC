@@ -1,0 +1,18 @@
+# REDHAVOC — Wordlist de usuarios para LABORATORIO (auditoría de credenciales débiles)
+# Uso: brute/ftp_login, brute/http_basic, brute/ssh_login
+admin
+administrator
+root
+usuario
+user
+test
+prueba
+ubuntu
+pi
+dev
+desarrollo
+soporte
+servicio
+backup
+guest
+demo

@@ -1,0 +1,26 @@
+# REDHAVOC — Wordlist de contraseñas para LABORATORIO (auditoría de credenciales débiles)
+# Uso: brute/ftp_login, brute/http_basic, brute/ssh_login
+# (top de claves por defecto, acotado a uso educativo/laboratorio)
+123456
+password
+admin
+1234
+root
+test
+prueba
+12345
+qwerty
+abc123
+letmein
+changeme
+toor
+0000
+123456789
+pass123
+admin123
+guest
+demo
+ubuntu
+raspberry
+california
+iloveyou

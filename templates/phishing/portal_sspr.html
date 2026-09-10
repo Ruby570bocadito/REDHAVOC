@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<!--
+  Plantilla de SIMULACIÓN de phishing (concienciación) — REDHAVOC
+  Uso exclusivo en campañas autorizadas de ciberseguridad.
+  Marcadores: {{ORG}} · {{TARGET_URL}} · {{FECHA}}
+  Tema: portal de restablecimiento de contraseña (SSPR de AD/Azure)
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Restablecer contraseña — {{ORG}}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { background: #eff3f8; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .tarjeta { background: #fff; width: 430px; border-radius: 10px; box-shadow: 0 8px 28px rgba(20,40,70,.14); overflow: hidden; }
+  .cabecera { background: #1f3a5f; color: #fff; padding: 20px 26px; }
+  .cabecera .logo { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .cabecera .sub { font-size: 12px; opacity: .8; margin-top: 3px; }
+  .cuerpo { padding: 28px; }
+  .pasos { display: flex; gap: 6px; margin-bottom: 20px; }
+  .paso { flex: 1; height: 5px; border-radius: 3px; background: #e2e8f0; }
+  .paso.activo { background: #1f6feb; }
+  .info { font-size: 13px; color: #33445c; line-height: 1.55; margin-bottom: 18px; }
+  .info b { color: #1f3a5f; }
+  .aviso { background: #fff4e5; border: 1px solid #ffd8a8; color: #7c4a03; font-size: 12.5px; padding: 10px 12px; border-radius: 8px; margin-bottom: 18px; }
+  label { display: block; font-size: 13px; color: #33445c; margin: 12px 0 4px; font-weight: 600; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid #c9d3e0; border-radius: 7px; font-size: 14px; outline: none; }
+  input:focus { border-color: #1f6feb; box-shadow: 0 0 0 3px rgba(31,111,235,.12); }
+  button { width: 100%; margin-top: 22px; background: #1f6feb; color: #fff; border: 0; padding: 12px; font-size: 15px; font-weight: 600; border-radius: 7px; cursor: pointer; }
+  button:hover { background: #1858c4; }
+  .pie { text-align: center; font-size: 11px; color: #9aa7b8; padding: 14px; border-top: 1px solid #eef2f7; }
+  .track { display: none; }
+</style>
+</head>
+<body>
+  <div class="tarjeta">
+    <div class="cabecera">
+      <div class="logo">🔑 Self-Service Password Reset · {{ORG}}</div>
+      <div class="sub">Servicio de identidades del dominio</div>
+    </div>
+    <div class="cuerpo">
+      <div class="pasos"><div class="paso activo"></div><div class="paso activo"></div><div class="paso"></div></div>
+      <div class="info">
+        Su contraseña del dominio <b>expira en menos de 24 horas</b>.
+        Para mantener el acceso al correo, la VPN y los archivos corporativos,
+        restablezca la contraseña ahora mismo con su usuario de red.
+      </div>
+      <div class="aviso">⚠️ Verificará su identidad con 2 preguntas de seguridad. Nunca pedimos el código MFA por teléfono.</div>
+      <form method="POST" action="/captura">
+        <label>Usuario de dominio</label>
+        <input type="text" name="usuario" placeholder="nombre.apellido@{{ORG_LOWER}}.com" required>
+        <label>Contraseña actual</label>
+        <input type="password" name="contrasena_actual" placeholder="••••••••" required>
+        <label>Nueva contraseña</label>
+        <input type="password" name="contrasena_nueva" placeholder="Mín. 12 caracteres" required>
+        <button type="submit">Restablecer contraseña</button>
+      </form>
+    </div>
+    <div class="pie">© {{ORG}} — SIMULACIÓN de concienciación · {{FECHA}} · Ninguna contraseña se restablece</div>
+  </div>
+  <img class="track" src="/track.gif" alt="">
+</body>
+</html>

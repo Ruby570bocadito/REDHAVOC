@@ -1,0 +1,43 @@
+# Wordlist de claves para LABORATORIO (REDHAVOC v1.3)
+# Claves estacionales/corporativas típicas para el spray autorizado.
+# Recordatorio: máximo 1-2 claves por campaña y con canario (ad/passwd_spray).
+Temporal1!
+Bienvenida1
+Bienvenida2024!
+Empresa2024!
+Empresa2025!
+Laboratorio1!
+P4ssw0rd!
+Password1!
+Password123!
+Changeme1!
+Cambio123!
+Welcome1!
+Welcome123!
+Summer2024!
+Verano2024!
+Invierno2024!
+Otono2024!
+Primavera2025!
+Enero2025!
+Febrero2025!
+Marzo2025!
+Abril2025!
+Mayo2025!
+Junio2025!
+Julio2025!
+Agosto2025!
+Septiembre2025!
+Octubre2025!
+Noviembre2025!
+Diciembre2025!
+Qwerty123!
+12345678
+123456Aa!
+Abc12345!
+Q1w2e3r4
+Zaq12wsx
+Passw0rd!
+Contraseña1!
+Alumno1!
+Practicas1!

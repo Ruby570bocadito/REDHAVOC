@@ -1,0 +1,18 @@
+{
+  "nombre": "Auditoría interna ACME — 2026 Q3",
+  "cliente": "ACME S.L.",
+  "kill_date": "2026-12-31",
+  "alcance": [
+    "corp.acme.local",
+    ".corp.acme.local",
+    "10.20.0.0/16",
+    "dc01.corp.acme.local",
+    "vpn.acme.com"
+  ],
+  "excluidos": [
+    "10.20.255.0/24",
+    "backup01.corp.acme.local"
+  ],
+  "permitir_fuera_alcance": false,
+  "notas": "Engagement de ejemplo REDHAVOC. El framework bloquea cualquier módulo cuyo objetivo (TARGET/URL/DOMAIN/HOST/RHOST/CIDR) quede fuera del alcance o cuando la kill_date haya pasada. Un dominio bare (corp.acme.local) incluye sus subdominios; también se admiten sufijos con punto (.corp.acme.local), wildcard *.corp.acme.local y CIDRs IPv4/IPv6. Los excluidos se bloquean siempre, aunque estén dentro del alcance."
+}

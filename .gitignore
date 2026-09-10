@@ -1,0 +1,19 @@
+# Datos locales de operación (nunca en el repo)
+workspace/
+output/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Entorno / editor
+.idea/
+.vscode/
+*.swp
+.DS_Store

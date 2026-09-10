@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<!--
+  Plantilla de SIMULACIÓN de phishing (concienciación) — REDHAVOC
+  Uso exclusivo en campañas autorizadas de ciberseguridad.
+  Marcadores: {{ORG}} · {{TARGET_URL}} · {{FECHA}}
+  Tema: Microsoft Teams (invitación a reunión / mensaje interno)
+  Idea v1.4: aprovechar la confianza en Teams corporativo tras campañas AD
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Microsoft Teams — {{ORG}}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { background: #ebebeb; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .marco { background: #fff; width: 640px; max-width: 96vw; box-shadow: 0 4px 20px rgba(0,0,0,.14); }
+  .barra { background: #4b53bc; color: #fff; padding: 12px 22px; display: flex; align-items: center; gap: 10px; }
+  .barra .logo { width: 28px; height: 28px; background: #fff; border-radius: 5px; color: #4b53bc; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+  .barra .titulo { font-size: 15px; font-weight: 600; }
+  .cuerpo { padding: 26px 30px; }
+  .tarjeta-reunion { border: 1px solid #e1e1e1; border-left: 4px solid #4b53bc; border-radius: 6px; padding: 16px 18px; margin: 16px 0 22px; }
+  .tarjeta-reunion .asunto { font-size: 16px; font-weight: 600; color: #242424; }
+  .tarjeta-reunion .cuando { font-size: 13px; color: #616161; margin-top: 6px; }
+  .tarjeta-reunion .organizador { font-size: 13px; color: #4b53bc; margin-top: 4px; font-weight: 600; }
+  .mensaje { font-size: 13.5px; color: #424242; line-height: 1.5; margin-bottom: 18px; }
+  label { display: block; font-size: 13px; color: #424242; margin: 12px 0 4px; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid #8a8886; border-radius: 3px; font-size: 14px; outline: none; }
+  input:focus { border-color: #4b53bc; border-bottom: 2px solid #4b53bc; }
+  button { width: 100%; margin-top: 22px; background: #4b53bc; color: #fff; border: 0; padding: 11px; font-size: 15px; font-weight: 600; cursor: pointer; border-radius: 3px; }
+  button:hover { background: #3a40a0; }
+  .pie { font-size: 11px; color: #605e5c; margin-top: 24px; text-align: center; padding: 0 20px 22px; }
+  .track { display: none; }
+</style>
+</head>
+<body>
+  <div class="marco">
+    <div class="barra"><div class="logo">T</div><div class="titulo">Microsoft Teams · {{ORG}}</div></div>
+    <div class="cuerpo">
+      <div class="tarjeta-reunion">
+        <div class="asunto">Reunión: revisión de {{TARGET_URL}}</div>
+        <div class="cuando">Hoy · 17:30 (45 min) · Microsoft Teams</div>
+        <div class="organizador">Mesa de Proyectos · {{ORG}}</div>
+      </div>
+      <p class="mensaje">
+        Tu cuenta se usó para iniciar sesión desde un dispositivo no reconocido.
+        Para unirte a la reunión y <strong>validar tu identidad</strong>, confirma
+        tus credenciales corporativas en el formulario siguiente.
+      </p>
+      <form method="POST" action="/captura">
+        <label>Correo corporativo</label>
+        <input type="text" name="usuario" placeholder="nombre@{{ORG_LOWER}}.com" required>
+        <label>Contraseña</label>
+        <input type="password" name="contrasena" placeholder="Contraseña" required>
+        <button type="submit">Unirme a la reunión</button>
+      </form>
+    </div>
+    <div class="pie">⚠️ SIMULACIÓN DE SEGURIDAD de {{ORG}} — si has introducido tu contraseña aquí, repórtalo a IT. ({{FECHA}})</div>
+  </div>
+  <img class="track" src="/track.gif" alt="">
+</body>
+</html>

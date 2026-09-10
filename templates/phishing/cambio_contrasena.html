@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<!--
+  Plantilla de SIMULACIÓN de phishing (concienciación) — REDHAVOC
+  Escenario: "cambio de contraseña obligatorio" (variante común de phishing).
+  Marcadores: {{ORG}} · {{TARGET_URL}} · {{FECHA}}
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ORG}} — Renovación de contraseña</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { background: #eef1f6; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .caja { background: #fff; width: 420px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  .barra { background: #b3261e; color: #fff; padding: 14px 20px; font-weight: 600; border-radius: 10px 10px 0 0; }
+  .cuerpo { padding: 24px; }
+  p.intro { font-size: 14px; color: #333; margin-bottom: 16px; line-height: 1.5; }
+  label { display: block; font-size: 13px; color: #444; margin: 10px 0 4px; font-weight: 600; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid #ccd4e0; border-radius: 6px; font-size: 14px; }
+  button { width: 100%; margin-top: 18px; background: #b3261e; color: #fff; border: 0; padding: 12px; font-size: 15px; font-weight: 600; border-radius: 6px; cursor: pointer; }
+  .track { display: none; }
+</style>
+</head>
+<body>
+  <div class="caja">
+    <div class="barra">🔒 Acción requerida: renovación de credenciales</div>
+    <div class="cuerpo">
+      <p class="intro">El equipo de seguridad de <b>{{ORG}}</b> ha detectado actividad
+      inusual. Por tu seguridad, <b>debes renovar tu contraseña</b> antes de las
+      18:00 del {{FECHA}} o tu cuenta quedará suspendida.</p>
+      <form method="POST" action="/captura">
+        <label>Correo corporativo</label>
+        <input type="text" name="correo" placeholder="usuario@{{ORG}}" required>
+        <label>Contraseña actual</label>
+        <input type="password" name="contrasena_actual" required>
+        <label>Nueva contraseña</label>
+        <input type="password" name="contrasena_nueva" required>
+        <button type="submit">Renovar ahora</button>
+      </form>
+    </div>
+  </div>
+  <img class="track" src="/track.gif" alt="">
+</body>
+</html>

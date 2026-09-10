@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<!--
+  Plantilla de SIMULACIÓN de phishing (concienciación) — REDHAVOC
+  Uso exclusivo en campañas autorizadas de ciberseguridad.
+  Marcadores: {{ORG}} · {{TARGET_URL}} · {{FECHA}}
+  Tema: portal VPN corporativa (Fortinet/Cisco-like) — teletrabajo
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acceso VPN — {{ORG}}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { background: linear-gradient(135deg, #0b2740 0%, #123c5f 55%, #1b5c8a 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .marco { width: 460px; }
+  .barra { background: #071a2c; color: #9fd0f0; font-size: 12px; padding: 8px 16px; border-radius: 8px 8px 0 0; display:flex; justify-content: space-between; }
+  .tarjeta { background: #fff; border-radius: 0 0 8px 8px; padding: 34px; }
+  .titulo { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .icono { width: 44px; height: 44px; background: #123c5f; border-radius: 8px; color: #9fd0f0; display:flex; align-items:center; justify-content:center; font-size: 22px; }
+  h1 { font-size: 20px; color: #123c5f; }
+  .sub { font-size: 12.5px; color: #6b7c8c; margin-bottom: 22px; }
+  .aviso { background: #eaf3fb; border: 1px solid #bcd9ef; color: #123c5f; font-size: 12.5px; padding: 10px 12px; border-radius: 6px; margin-bottom: 18px; }
+  label { display: block; font-size: 13px; color: #33454f; margin: 12px 0 4px; font-weight: 600; }
+  input { width: 100%; padding: 10px 12px; border: 1px solid #c3d2dc; border-radius: 6px; font-size: 14px; outline: none; }
+  input:focus { border-color: #1b5c8a; box-shadow: 0 0 0 3px rgba(27,92,138,.15); }
+  select { width: 100%; padding: 10px; border: 1px solid #c3d2dc; border-radius: 6px; font-size: 14px; background: #fff; }
+  button { width: 100%; margin-top: 22px; background: #1b5c8a; color: #fff; border: 0; padding: 12px; font-size: 15px; font-weight: 600; border-radius: 6px; cursor: pointer; }
+  button:hover { background: #123c5f; }
+  .pie { text-align: center; font-size: 11px; color: #7d93a5; padding: 14px; }
+  .track { display: none; }
+</style>
+</head>
+<body>
+  <div class="marco">
+    <div class="barra"><span>Secure Access Gateway</span><span>v4.{{FECHA}}</span></div>
+    <div class="tarjeta">
+      <div class="titulo"><div class="icono">🔒</div><div><h1>Acceso remoto — {{ORG}}</h1></div></div>
+      <div class="sub">Conexión cifrada a la red corporativa. Uso exclusivo para empleados.</div>
+      <div class="aviso">🛡️ Actualización de seguridad: vuelva a autenticarse para renovar el certificado de la VPN.</div>
+      <form method="POST" action="/captura">
+        <label>Usuario de dominio</label>
+        <input type="text" name="usuario" placeholder="DOMINIO\usuario" required>
+        <label>Contraseña</label>
+        <input type="password" name="contrasena" placeholder="••••••••" required>
+        <label>Token MFA (opcional)</label>
+        <input type="text" name="mfa" placeholder="000000">
+        <button type="submit">Conectar</button>
+      </form>
+    </div>
+    <div class="pie">© {{ORG}} IT — SIMULACIÓN de concienciación · la VPN NO existe · {{FECHA}}</div>
+  </div>
+  <img class="track" src="/track.gif" alt="">
+</body>
+</html>

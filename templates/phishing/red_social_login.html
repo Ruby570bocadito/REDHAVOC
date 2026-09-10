@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<!--
+  Plantilla de SIMULACIÓN de phishing (concienciación) — REDHAVOC
+  Uso exclusivo en campañas autorizadas de ciberseguridad.
+  Marcadores: {{ORG}} · {{TARGET_URL}} · {{FECHA}}
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ORG}} — Red social corporativa</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+  body { background: linear-gradient(160deg, #1e3c72 0%, #2a5298 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .tarjeta { background: #fff; width: 380px; border-radius: 14px; box-shadow: 0 12px 34px rgba(0,20,60,.35); overflow: hidden; }
+  .cabecera { background: #1877c9; color: #fff; padding: 24px; text-align: center; }
+  .cabecera .logo { font-size: 25px; font-weight: 700; }
+  .cabecera .sub { font-size: 12.5px; opacity: .9; margin-top: 5px; }
+  .cuerpo { padding: 26px; }
+  .aviso { background: #e7f0ff; border: 1px solid #b6d4fb; color: #14497e; font-size: 13px; padding: 10px 12px; border-radius: 8px; margin-bottom: 18px; }
+  label { display: block; font-size: 13px; color: #333; margin: 12px 0 4px; font-weight: 600; }
+  input[type=text], input[type=password] { width: 100%; padding: 11px 12px; border: 1px solid #ccd6e4; border-radius: 8px; font-size: 14px; outline: none; }
+  input:focus { border-color: #1877c9; box-shadow: 0 0 0 3px rgba(24,119,201,.15); }
+  button { width: 100%; margin-top: 20px; background: #1877c9; color: #fff; border: 0; padding: 12px; font-size: 15px; font-weight: 600; border-radius: 8px; cursor: pointer; }
+  button:hover { background: #1465ab; }
+  .extra { text-align: center; margin-top: 14px; font-size: 12.5px; color: #1877c9; }
+  .pie { text-align: center; font-size: 11px; color: #98a2b3; padding: 14px; border-top: 1px solid #eef1f6; }
+  .track { display: none; }
+</style>
+</head>
+<body>
+  <div class="tarjeta">
+    <div class="cabecera">
+      <div class="logo">{{ORG}} Social</div>
+      <div class="sub">Red interna del equipo · Conéctate con tus compañeros</div>
+    </div>
+    <div class="cuerpo">
+      <div class="aviso">👥 Tienes <b>3 solicitudes de conexión</b> pendientes desde {{FECHA}}. Inicia sesión para verlas.</div>
+      <form method="POST" action="/captura">
+        <label>Correo o usuario</label>
+        <input type="text" name="usuario" placeholder="nombre@empresa.com" required>
+        <label>Contraseña</label>
+        <input type="password" name="contrasena" placeholder="••••••••" required>
+        <button type="submit">Entrar a la red</button>
+        <div class="extra">¿Olvidaste la contraseña?</div>
+      </form>
+    </div>
+    <div class="pie">© {{ORG}} — Simulación de seguridad · Esto NO es el servicio real</div>
+  </div>
+  <img class="track" src="/track.gif" alt="">
+</body>
+</html>
